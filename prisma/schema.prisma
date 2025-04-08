@@ -1,0 +1,272 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("SUPABASE_DIRECT_URL")
+}
+
+
+
+model User {
+  id                 String     @id @default(uuid())
+  email              String     @unique
+  password           String?
+  needPasswordChange Boolean?   @default(true)
+  authProvider       String?    @default("OWN")
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  role               UserRole
+  status             UserStatus @default(ACTIVE)
+  admin              Admin?
+  doctor             Doctor?
+  patient            Patient?
+  // profileId          String?
+
+  @@map("users")
+}
+
+model Admin {
+  id            String   @id @default(uuid())
+  name          String
+  email         String   @unique
+  profilePhoto  String?
+  contactNumber String?
+  isDeleted     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [email], references: [email])
+}
+
+model Doctor {
+  id                  String            @id @default(uuid())
+  email               String            @unique
+  name                String
+  profilePhoto        String?
+  contactNumber       String
+  address             String?
+  registrationNumber  String
+  experience          Int               @default(0)
+  gender              Gender
+  apointmentFee       Int
+  qualification       String
+  currentWorkingPlace String
+  designation         String
+  averageRating       Float?            @default(0.0)
+  ratingCount         Int               @default(0)
+  isDeleted           Boolean           @default(false)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  user                User              @relation(fields: [email], references: [email])
+  specialties         DoctorSpecialty[]
+  DoctorSchedule      DoctorSchedule[]
+  Appointment         Appointment[]
+  Prescription        Prescription[]
+  Review              Review[]
+}
+
+model Patient {
+  id                    String                 @id @unique @default(uuid())
+  email                 String                 @unique
+  name                  String
+  profilePhoto          String?
+  contactNumber         String?
+  address               String?
+  isDeleted             Boolean                @default(false)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+  user                  User                   @relation(fields: [email], references: [email])
+  appointment           Appointment[]
+  prescription          Prescription[]
+  review                Review[]
+  patientMedicalHistory PatientMedicalHistory?
+}
+
+model PatientMedicalHistory {
+  id                  String    @id @default(uuid())
+  patientId           String    @unique
+  patient             Patient   @relation(fields: [patientId], references: [id])
+  dateOfBirth         DateTime?
+  gender              Gender?
+  bloodGroup          String?
+  hasAllergies        Boolean?  @default(false)
+  hasDiabetes         Boolean?  @default(false)
+  height              String?
+  weight              String?
+  smokingStatus       Boolean?  @default(false)
+  dietaryPreferences  String?
+  pregnancyStatus     Boolean?  @default(false)
+  mentalHealthHistory String?
+  immunizationStatus  Boolean?  @default(false)
+  hasPastSurgeries    Boolean?  @default(false)
+  recentAnxiety       Boolean?  @default(false)
+  recentDepression    Boolean?  @default(false)
+  wantToAdd           String?
+  maritalStatus       String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+}
+
+model Specialty {
+  id              String            @id @default(uuid())
+  title           String            @unique
+  icon            String?
+  createdAt       DateTime          @default(now())
+  DoctorSpecialty DoctorSpecialty[]
+}
+
+model DoctorSpecialty {
+  doctorId    String
+  specialtyId String
+  doctor      Doctor    @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  specialty   Specialty @relation(fields: [specialtyId], references: [id], onDelete: Cascade)
+
+  @@id([specialtyId, doctorId])
+}
+
+model Schedule {
+  id             String           @id @default(uuid())
+  startDateTime  DateTime
+  endDateTime    DateTime
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  DoctorSchedule DoctorSchedule[]
+  Appointment    Appointment[]
+}
+
+model DoctorSchedule {
+  doctorId      String
+  scheduleId    String
+  appointmentId String?
+  isBooked      Boolean  @default(false)
+  doctor        Doctor   @relation(fields: [doctorId], references: [id])
+  schedule      Schedule @relation(fields: [scheduleId], references: [id])
+
+  @@id([doctorId, scheduleId])
+}
+
+model Appointment {
+  id             String            @id @default(uuid())
+  patientId      String
+  doctorId       String
+  scheduleId     String
+  videoCallingId String
+  status         AppointmentStatus @default(PENDING)
+  paymentStatus  PaymentStatus     @default(UNPAID)
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  patient        Patient           @relation(fields: [patientId], references: [id])
+  doctor         Doctor            @relation(fields: [doctorId], references: [id])
+  schedule       Schedule          @relation(fields: [scheduleId], references: [id])
+  Payment        Payment[]
+  Prescription   Prescription[]
+  Review         Review[]
+}
+
+model Payment {
+  id                 String        @id @default(uuid())
+  appointmentId      String
+  amount             Float
+  transactionId      String        @unique
+  status             PaymentStatus @default(UNPAID)
+  paymentGatewayData Json?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  appointment        Appointment   @relation(fields: [appointmentId], references: [id])
+}
+
+model Prescription {
+  id                  String       @id @default(uuid())
+  appointmentId       String
+  doctorId            String
+  patientId           String
+  issuedAt            DateTime?
+  diagnosis           String?
+  medications         Medication[]
+  followUpDate        DateTime?
+  recommendedLabTests String?
+  note                String?
+  isDeleted           Boolean?     @default(false)
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  appointment Appointment @relation(fields: [appointmentId], references: [id])
+  doctor      Doctor      @relation(fields: [doctorId], references: [id])
+  patient     Patient     @relation(fields: [patientId], references: [id])
+}
+
+model Medication {
+  id             String  @id @default(uuid())
+  prescriptionId String
+  name           String
+  dosage         String
+  frequency      String
+  duration       String
+  instruction    String?
+
+  prescription Prescription @relation(fields: [prescriptionId], references: [id])
+}
+
+model ChatMessage {
+  id         Int      @id @default(autoincrement())
+  senderId   String
+  receiverId String
+  message    String
+  type       String   @default("text")
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+model Review {
+  id            String   @id @default(uuid())
+  doctorId      String
+  patientId     String
+  appointmentId String?
+  rating        Int
+  comment       String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
+  doctor      Doctor       @relation(fields: [doctorId], references: [id])
+  patient     Patient      @relation(fields: [patientId], references: [id])
+}
+
+model test {
+  testId   String @id @default(uuid())
+  testname String
+}
+
+enum UserRole {
+  ADMIN
+  DOCTOR
+  PATIENT
+  SUPER_ADMIN
+}
+
+enum UserStatus {
+  BLOCKED
+  ACTIVE
+  PENDING
+  DELETED
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum AppointmentStatus {
+  PENDING
+  SCHEDULED
+  INPROGRESS
+  COMPLETED
+  CANCELED
+}
+
+enum PaymentStatus {
+  PAID
+  UNPAID
+}
